@@ -9,7 +9,7 @@
 *   **Schwierigkeit:** Easy
 *   **Autor der VM:** DarkSpirit
 *   **Datum des Writeups:** 14. Juli 2021
-*   **Original-Writeup:** https://alientec1908.github.io/Noob_HackMyVM_Medium/
+*   **Original-Writeup:** https://alientec1908.github.io/Noob_HackMyVM_Easy/
 *   **Autor:** Ben C.
 
 ## Kurzbeschreibung
